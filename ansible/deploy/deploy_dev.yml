@@ -1,0 +1,56 @@
+- name: Deploy to dev server
+  hosts: dev
+  vars:
+    project_dir: /home/{{ansible_user}}/{{server_project_dir}}
+    docker_container: "{{php_container}}"
+    git_repo_url: "https://{{ git_user }}:{{ git_token }}@{{ git_repo }}"
+  become: yes
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: Debug token value
+      debug:
+        msg: "Git token: {{ git_repo_url }}"
+
+    - name: Ensure project directory exists
+      file:
+        path: "{{ project_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Change to project directory
+      command: chdir="{{ project_dir }}" ls
+      register: dir_changed
+      failed_when: dir_changed.rc != 0
+    # Включать при первом запуске
+    #    - name: Clone Git repository if not already cloned
+    #      git:
+    #        repo: "{{ git_repo_url }}"
+    #        dest: "{{ project_dir }}"
+    #        clone: yes
+    #        update: yes
+    #        version: dev
+    #        ssh_opts: "-o StrictHostKeyChecking=no"
+
+    - name: Check Git branch and switch if necessary
+      shell: |
+        cd {{ project_dir }}
+        git status
+        git checkout dev
+      register: git_status
+      changed_when: "'On branch dev' not in git_status.stdout"
+
+    - name: Pull latest changes from Git
+      shell: |
+        cd {{ project_dir }}
+        git pull {{git_repo_url}}
+      register: git_pull
+      changed_when: "'Already up to date.' not in git_pull.stdout"
+
+    - name: Install dependencies from compose.json
+      shell: |
+        docker exec -it {{ docker_container }} /bin/sh -c "composer install"
+
+    - name: Run database migrations
+      shell: |
+        docker exec -it {{ docker_container }} /bin/sh -c "php artisan migrate --force"

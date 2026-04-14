@@ -1,0 +1,26 @@
+stages:
+  - deploy
+
+deploy:
+  stage: deploy
+  image: docker:24.0.6
+  before_script:
+    - rm -rf -R ./ansible/ssh-key
+    - mkdir -p ./ansible/ssh-key
+    - chmod 700 ./ansible/ssh-key
+    - echo "$ANSIBLE_SSH_PRIVATE_KEY" > ./ansible/ssh-key/dev-and-stage-key
+    - chmod 600 ./ansible/ssh-key
+    - |
+      if ! test -s ./ansible/deploy/vars.yml; then
+        echo "git_repo: $GITLAB_REPO" > ./ansible/deploy/vars.yml
+        echo "git_token: $GITLAB_TOKEN" >> ./ansible/deploy/vars.yml
+        echo "git_user: $GIT_USER" >> ./ansible/deploy/vars.yml
+      fi
+  script:
+    - docker build -t ansible ./ansible
+    - docker rm -f ansible || true
+    - docker run -d --name ansible ansible
+    - docker exec ansible chmod 600 ./ssh-key/dev-and-stage-key
+    - docker exec ansible ansible-playbook -i hosts/hosts.ini deploy/deploy_dev.yml
+  only:
+    - dev
