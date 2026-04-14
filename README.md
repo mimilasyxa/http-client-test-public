@@ -32,3 +32,9 @@
 ## Запуск синхронизации
 
 Добавлена команда - `php artisan app:sync-project` которая запускает синхронизацию по всем сущностям
+
+## Тестовый сервер с mysql
+ - host: 185.245.40.9:3306
+ - login: read-only_user 
+ - pass: password
+ - Таблицы `incomes` `orders` `sales` `stocks`
